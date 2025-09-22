@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Autenticación Pastel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fef6fb;
+      --card: #ffffff;
+      --text: #3a3a3a;
+      --muted: #777;
+      --accent: #a3c4f3;
+      --accent2: #cdb4db;
+      --accent3: #b5ead7;
+      --danger: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Poppins, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      width: 100%;
+      display: grid;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+    label { display: block; margin-top: 12px; font-size: 14px; color: var(--muted); }
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    .btn {
+      margin-top: 16px;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+    }
+    .btn.secondary { background: var(--accent3); color: var(--text); }
+    .btn.danger { background: var(--danger); }
+    .msg { font-size: 14px; margin-top: 8px; }
+    .success { color: green; }
+    .error { color: var(--danger); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    #dashboard { display: none; }
+    #profilePic { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 12px 0; border: 3px solid var(--accent2); }
+  </style>
+</head>
+<body>
+  <div class="container" id="authBox">
+    <div class="card">
+      <h1>✨ Bienvenido</h1>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Crear cuenta</h2>
+        <label>Nombre</label>
+        <input id="signupName" placeholder="Tu nombre" />
+        <label>Email</label>
+        <input id="signupEmail" type="email" placeholder="ejemplo@email.com" />
+        <label>Contraseña</label>
+        <input id="signupPass" type="password" placeholder="••••••" />
+        <button class="btn" id="btnSignup">Registrarme</button>
+        <div class="msg" id="signupMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Iniciar sesión</h2>
+        <label>Email</label>
+        <input id="loginEmail" type="email" />
+        <label>Contraseña</label>
+        <input id="loginPass" type="password" />
+        <button class="btn" id="btnLogin">Entrar</button>
+        <button class="btn secondary" id="btnReset">Olvidé mi contraseña</button>
+        <div class="msg" id="loginMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="container" id="dashboard">
+    <div class="card">
+      <h2>👋 Hola, <span id="userName">Usuario</span></h2>
+      <img id="profilePic" src="https://via.placeholder.com/100" alt="Foto de perfil">
+      <input type="file" id="fileInput" accept="image/*" />
+      <button class="btn secondary" id="btnUploadPic">Subir foto</button>
+      <div class="msg" id="picMsg"></div>
+      <p>Bienvenido a tu panel personal. Aquí puedes ver y actualizar tus datos:</p>
+      <ul>
+        <li><strong>Email:</strong> <span id="userEmail"></span></li>
+        <li><strong>UID:</strong> <span id="userUid"></span></li>
+      </ul>
+      <label>Actualizar nombre</label>
+      <input id="editName" placeholder="Nuevo nombre" />
+      <button class="btn secondary" id="btnUpdateName">Guardar nombre</button>
+      <div class="msg" id="updateMsg"></div>
+      <button class="btn danger" id="btnLogout">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBaUL9OFUNDhmNz0UydD7yorvkKWAz6yu4",
+      authDomain: "auth-5a6fd.firebaseapp.com",
+      projectId: "auth-5a6fd",
+      storageBucket: "auth-5a6fd.firebasestorage.app",
+      messagingSenderId: "332361162009",
+      appId: "1:332361162009:web:643abe47529d86281df988",
+      measurementId: "G-8GX30JDHJP"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    const $ = id => document.getElementById(id);
+    const show = (el, msg, cls="") => { el.textContent = msg; el.className = `msg ${cls}`; };
+
+    const authBox = $("authBox");
+    const dashboard = $("dashboard");
+    let currentUser = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        authBox.style.display = "none";
+        dashboard.style.display = "grid";
+        $("userEmail").textContent = user.email;
+        $("userUid").textContent = user.uid;
+        // cargar datos de Firestore
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          $("userName").textContent = data.name || "Usuario";
+          if (data.photoURL) {
+            $("profilePic").src = data.photoURL;
+          }
+        } else {
+          $("userName").textContent = "Usuario";
+        }
+      } else {
+        currentUser = null;
+        authBox.style.display = "grid";
+        dashboard.style.display = "none";
+      }
+    });
+
+    $("btnSignup").addEventListener("click", async () => {
+      try {
+        const name = $("signupName").value.trim();
+        const email = $("signupEmail").value.trim();
+        const pass = $("signupPass").value;
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name,
+          email,
+          createdAt: serverTimestamp()
+        });
+        show($("signupMsg"), "Cuenta creada con éxito.", "success");
+      } catch (err) {
+        show($("signupMsg"), err.message, "error");
+      }
+    });
+
+    $("btnLogin").addEventListener("click", async () => {
+      try {
+        const email = $("loginEmail").value.trim();
+        const pass = $("loginPass").value;
+        await signInWithEmailAndPassword(auth, email, pass);
+        show($("loginMsg"), "Sesión iniciada.", "success");
+      } catch (err) {
+        show($("loginMsg"), err.message, "error");
+      }
+    });
+
+    $("btnReset").addEventListener("click", async () => {
+      try {
+        const email = $("loginEmail").value.trim();
+        await sendPasswordResetEmail(auth, email);
+        show($("loginMsg"), "Correo de recuperación enviado.", "success");
+      } catch (err) {
+        show($("loginMsg"), err.message, "error");
+      }
+    });
+
+    $("btnUpdateName").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const newName = $("editName").value.trim();
+      if (!newName) {
+        show($("updateMsg"), "El nombre no puede estar vacío.", "error");
+        return;
+      }
+      try {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          name: newName,
+          updatedAt: serverTimestamp()
+        });
+        $("userName").textContent = newName;
+        show($("updateMsg"), "Nombre actualizado.", "success");
+      } catch (err) {
+        show($("updateMsg"), err.message, "error");
+      }
+    });
+
+    $("btnUploadPic").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const file = $("fileInput").files[0];
+      if (!file) {
+        show($("picMsg"), "Selecciona una imagen.", "error");
+        return;
+      }
+      try {
+        const storageRef = ref(storage, `profilePics/${currentUser.uid}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          photoURL: url,
+          updatedAt: serverTimestamp()
+        });
+        $("profilePic").src = url;
+        show($("picMsg"), "Foto actualizada.", "success");
+      } catch (err) {
+        show($("picMsg"), err.message, "error");
+      }
+    });
+
+    $("btnLogout").addEventListener("click", async () => {
+      await signOut(auth);
+    });
+  </script>
+</body>
+</html>
